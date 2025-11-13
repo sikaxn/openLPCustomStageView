@@ -1,0 +1,77 @@
+/******************************************************************************
+ * LED BANNER VIEW (192 px tall, center aligned, single-line current lyric)
+ ******************************************************************************/
+
+@font-face {
+  font-family: "BannerFont";
+  src: url("NotoSansSC-VariableFont_wght.ttf") format("truetype");
+}
+
+:root {
+  --font-stack:
+    "BannerFont",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft JhengHei",
+    "PingFang TC",
+    "Source Han Sans SC",
+    "Source Han Sans TC",
+    "Noto Sans CJK SC",
+    "Noto Sans CJK TC",
+    sans-serif;
+
+  /* LED panel safe height */
+  --banner-height: 192px;
+
+  /* Padding inside banner */
+  --vertical-padding: 8px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-stack);
+}
+
+/* Outer container = LED panel area */
+#banner-container {
+  width: 100%;
+  height: var(--banner-height);
+  padding-top: var(--vertical-padding);
+  padding-bottom: var(--vertical-padding);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+
+  background: black;
+}
+
+/* Auto scaling single-line text */
+#line-current {
+  color: #ffffff;
+  text-align: center;
+  white-space: nowrap;
+
+  /* Auto-scale using viewport height relative to banner height */
+  /* 192 px → ~100vh of this context, so clamp will scale naturally */
+  font-size: clamp(20px, 16vh, 180px);
+  line-height: 1.0;
+  font-weight: 700;
+}
+
+/* If line is empty, hide completely */
+#line-current:empty {
+  display: none;
+}
+
+/* Hide OpenLP original elements */
+#right, #clock, #notes, #verseorder, #currentslide, #nextslide {
+  display: none !important;
+}
