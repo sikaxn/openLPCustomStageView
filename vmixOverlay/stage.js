@@ -31,6 +31,10 @@ window.OpenLP = {
         data = JSON.parse(reader.result.toString()).results;
         // set some global var
         OpenLP.myTwelve = data.twelve;
+        // Save display mode from WebSocket
+        OpenLP.display = data.display || "";   // "show", "blank", "theme", "desktop"
+        OpenLP.isBlank = data.blank || false;  // true = blanked
+        OpenLP.isThemeBlank = data.theme || false; // true = blank to theme/background
 
         if (OpenLP.currentItem != data.item ||
             OpenLP.currentService != data.service) {
@@ -143,6 +147,27 @@ window.OpenLP = {
    * - If empty/whitespace: show nothing (no song title fallback)
    ***********************************************************************/
   updateSlide: function () {
+
+    // ---------------------------------------------------------
+    // 1. BLANK / DESKTOP / BACKGROUND → vMix overlay MUST HIDE
+    // ---------------------------------------------------------
+    if (
+      OpenLP.display === "blank" ||      // blank to black OR blank to theme
+      OpenLP.display === "desktop" ||    // operating system desktop
+      OpenLP.display === "theme" ||      // show background only
+      OpenLP.isBlank === true            // depending on your version
+    ) {
+      // Completely hide overlay
+      $("#currentslide").html("");
+      $("#nextslide").html("");
+      return;
+    }
+
+
+    // ---------------------------------------------------------
+    // 2. NORMAL SLIDE MODE
+    // ---------------------------------------------------------
+
     // Verse tag highlight
     $("#verseorder span").removeClass("currenttag");
     $("#tag" + OpenLP.currentTags[OpenLP.currentSlide]).addClass("currenttag");
@@ -159,13 +184,9 @@ window.OpenLP = {
     }
     else {
       // Real lyric: convert newlines to <br />
-      var text = rawText.replace(/\r/g, "").replace(/\n/g, "<br />");
-
-      // Ignore images for overlay (no thumbnails)
-      // if (slide["img"]) { ... } // intentionally not used
-
-      // Ignore slide footer/notes for overlay
-      // if (slide["slide_notes"]) { ... } // intentionally not used
+      var text = rawText
+        .replace(/\r/g, "")
+        .replace(/\n/g, "<br />");
 
       $("#currentslide").html(text);
     }
@@ -207,7 +228,8 @@ window.OpenLP = {
 
       $("#nextslide").html(nextText);
     }
-  },
+},
+
 
   updateClock: function (data) {
     var div = $("#clock");
