@@ -23,6 +23,7 @@ window.OpenLP = {
     const host = window.location.hostname;
     const websocket_port = 4317;
     var myTwelve;
+    window.currentLayer = "A";
 
     ws = new WebSocket(`ws://${host}:${websocket_port}`);
     ws.onmessage = (event) => {
@@ -141,95 +142,100 @@ window.OpenLP = {
     );
   },
 
-  /***********************************************************************
-   * updateSlide() — lyric-overlay behaviour
-   * - Current slide: use ONLY slide["text"]
-   * - If empty/whitespace: show nothing (no song title fallback)
-   ***********************************************************************/
-  updateSlide: function () {
+/***********************************************************************
+ * updateSlide() — Lyric Overlay Version with TRUE 2-layer crossfade
+ * - Handles: text→text, text→blank, blank→text, image→blank
+ * - Uses layer swap for flicker-free transitions
+ ***********************************************************************/
+updateSlide: function () {
+  let newHtml = "";  // default = blank
 
-    // ---------------------------------------------------------
-    // 1. BLANK / DESKTOP / BACKGROUND → vMix overlay MUST HIDE
-    // ---------------------------------------------------------
-    if (
-      OpenLP.display === "blank" ||      // blank to black OR blank to theme
-      OpenLP.display === "desktop" ||    // operating system desktop
-      OpenLP.display === "theme" ||      // show background only
-      OpenLP.isBlank === true            // depending on your version
-    ) {
-      // Completely hide overlay
-      $("#currentslide").html("");
-      $("#nextslide").html("");
-      return;
-    }
+  const slide = OpenLP.currentSlides[OpenLP.currentSlide];
 
+  // ---------------------------------------------------------------
+  // Determine whether the overlay MUST be blank
+  // ---------------------------------------------------------------
+  const forceBlank =
+    OpenLP.display === "blank" ||
+    OpenLP.display === "desktop" ||
+    OpenLP.display === "theme" ||
+    OpenLP.isBlank === true;
 
-    // ---------------------------------------------------------
-    // 2. NORMAL SLIDE MODE
-    // ---------------------------------------------------------
+  // ---------------------------------------------------------------
+  // If not forced blank, attempt to extract text
+  // ---------------------------------------------------------------
+  if (!forceBlank && slide) {
+    const imgSrc = slide.img || "";
+    const html = slide.html || "";
+    const rawText = slide.text || "";
 
-    // Verse tag highlight
-    $("#verseorder span").removeClass("currenttag");
-    $("#tag" + OpenLP.currentTags[OpenLP.currentSlide]).addClass("currenttag");
+    const hasImage =
+      (imgSrc && imgSrc.trim() !== "") ||
+      html.includes("<img") ||
+      rawText.includes("<img");
 
-    var slide = OpenLP.currentSlides[OpenLP.currentSlide];
-
-    // For lyric overlay, only use slide["text"] for current slide
-    var rawText = slide["text"];
-    var isEmpty = (!rawText || /^\s*$/.test(rawText));
-
-    if (isEmpty) {
-      // Empty lyric → hide completely
-      $("#currentslide").html("");
-    }
-    else {
-      // Real lyric: convert newlines to <br />
-      var text = rawText
+    if (!hasImage) {
+      const cleaned = rawText
         .replace(/\r/g, "")
-        .replace(/\n/g, "<br />");
+        .replace(/\n/g, "<br>")
+        .trim();
 
-      $("#currentslide").html(text);
+      if (cleaned !== "")
+        newHtml = cleaned;
     }
+  }
 
-    // ----------------------
-    // NEXT SLIDE RENDERING
-    // (kept for compatibility, normally hidden in CSS)
-    // ----------------------
+  // ---------------------------------------------------------------
+  // Determine which layer is currently visible
+  // ---------------------------------------------------------------
+  const active = (OpenLP.currentLayer === "A") ? "#lyricA" : "#lyricB";
+  const oldHtml = $(active).html();
 
-    var nextText = "";
+  // ---------------------------------------------------------------
+  // If content did not change → do nothing
+  // ---------------------------------------------------------------
+  if (oldHtml === newHtml) return;
 
-    if (OpenLP.currentSlide < OpenLP.currentSlides.length - 1) {
-      for (var idx = OpenLP.currentSlide + 1; idx < OpenLP.currentSlides.length; idx++) {
+  // ---------------------------------------------------------------
+  // TRUE 2-layer crossfade (no flicker)
+  // ---------------------------------------------------------------
+  OpenLP.swapLayers(newHtml);
 
-        if (OpenLP.currentTags[idx] != OpenLP.currentTags[idx - 1])
-          nextText += "<p class=\"nextslide\">";
-
-        if (OpenLP.currentSlides[idx]["text"])
-          nextText += OpenLP.currentSlides[idx]["text"];
-        else
-          nextText += OpenLP.currentSlides[idx]["title"];
-
-        if (OpenLP.currentTags[idx] != OpenLP.currentTags[idx - 1])
-          nextText += "</p>";
-        else
-          nextText += "<br />";
-      }
-
-      nextText = nextText.replace(/\n/g, "<br />");
-      $("#nextslide").html(nextText);
+  // NEXT SLIDE (kept hidden by CSS, unchanged)
+  var nextText = "";
+  if (OpenLP.currentSlide < OpenLP.currentSlides.length - 1) {
+    for (var idx = OpenLP.currentSlide + 1; idx < OpenLP.currentSlides.length; idx++) {
+      if (OpenLP.currentSlides[idx]["text"])
+        nextText += OpenLP.currentSlides[idx]["text"];
+      else
+        nextText += OpenLP.currentSlides[idx]["title"];
+      nextText += "<br />";
     }
-    else {
-      nextText =
-        "<p class=\"nextslide\">" +
-        $("#next-text").val() +
-        ": " +
-        OpenLP.nextSong +
-        "</p>";
-
-      $("#nextslide").html(nextText);
-    }
+    nextText = nextText.replace(/\n/g, "<br />");
+    $("#nextslide").html(nextText);
+  } else {
+    nextText =
+      "<p class=\"nextslide\">" +
+      $("#next-text").val() + ": " +
+      OpenLP.nextSong +
+      "</p>";
+    $("#nextslide").html(nextText);
+  }
 },
 
+
+
+fadeOut: function(callback) {
+  const elem = $("#currentslide");
+  elem.css("opacity", "0");
+  setTimeout(() => {
+    if (callback) callback();
+  }, 80); // match 0.08s transition
+},
+
+fadeIn: function() {
+  $("#currentslide").css("opacity", "1");
+},
 
   updateClock: function (data) {
     var div = $("#clock");
@@ -245,7 +251,27 @@ window.OpenLP = {
 
     div.html(h + ":" + m);
   },
+
+  swapLayers: function(newHtml) {
+  const top = OpenLP.currentLayer === "A" ? "#lyricA" : "#lyricB";
+  const bottom = OpenLP.currentLayer === "A" ? "#lyricB" : "#lyricA";
+
+  // bottom becomes new content
+  $(bottom).html(newHtml);
+
+  // fade out current
+  $(top).css("opacity", 0);
+
+  // fade in new
+  $(bottom).css("opacity", 1);
+
+  // switch active layer
+  OpenLP.currentLayer = OpenLP.currentLayer === "A" ? "B" : "A";
+},
+
 };
+
+
 
 $.ajaxSetup({ cache: false });
 setInterval("OpenLP.updateClock();", 500);

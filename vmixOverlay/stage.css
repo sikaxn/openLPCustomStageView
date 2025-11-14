@@ -64,6 +64,7 @@ body {
   justify-content: center;    /* centre horizontally */
   padding: 7vh 6vw;           /* bottom padding so text is above lower edge */
   box-sizing: border-box;
+  padding-bottom: 150px;
 }
 
 /* Current lyric styling */
@@ -110,3 +111,62 @@ body {
 #currentslide:blank {
   display: none;
 }
+
+#currentslide {
+  /* existing styles... */
+
+  opacity: 1;
+  transition: opacity 0.08s ease-in-out; /* < 0.1 sec */
+}
+
+/* NEW: container that replaces #currentslide */
+/* Container replacing #currentslide */
+#lyric-container {
+  position: relative;
+
+  /* Match original behavior */
+  width: 100%;
+  max-width: 80vw;
+  text-align: center;
+
+  /* keep at bottom from #overlay-container padding */
+  display: block;
+
+  /* Prevent shrinking */
+  min-height: 1em;
+}
+
+/* TRUE overlay layers (fill entire container) */
+.lyric-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  /* Fill full width like old #currentslide */
+  width: 100%;
+
+  /* Let text wrap properly */
+  white-space: normal;
+  word-wrap: break-word;
+
+  /* Maintain same styling as original */
+  font-size: clamp(32px, 4vw, 64px);
+  line-height: 1.2;
+  color: #fff;
+
+  text-shadow:
+    0 0 4px rgba(0,0,0,.8),
+    0 0 8px rgba(0,0,0,.9),
+    0 0 16px rgba(0,0,0,1);
+
+  opacity: 0;
+  transition: opacity 0.08s linear;
+
+  /* For perfect height: content determines height */
+  display: block;
+}
+
+
+
+#lyricA { z-index: 1; }
+#lyricB { z-index: 2; }

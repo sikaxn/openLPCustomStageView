@@ -1,5 +1,6 @@
 /******************************************************************************
  * Caption Stage View (Adaptive 4 lines + highlight + title)
+ * + Image support: if slide has an image, show ONLY that image
  ******************************************************************************/
 
 window.OpenLP = {
@@ -65,62 +66,95 @@ window.OpenLP = {
       OpenLP.loadService();
     });
   },
-  
-/***********************************************************************
- * updateCaption() — Smart 4-line caption with conditional highlight
- * - Skip empty slides
- * - Always show up to 4 lines
- * - Highlight ONLY if the actual "current slide" has text
- ***********************************************************************/
-updateCaption: function () {
-  var collected = [];
 
-  function getText(idx) {
-    if (!OpenLP.currentSlides[idx]) return "";
-    var t = OpenLP.currentSlides[idx]["text"] || "";
-    return t.replace(/\r/g, "").replace(/\n/g, "<br>").trim();
-  }
+  /***********************************************************************
+   * updateCaption() — Smart 4-line caption with conditional highlight
+   * - NEW: If slide has an image → show the image ONLY
+   * - Skip empty slides
+   * - Always show up to 4 lines
+   * - Highlight ONLY if the actual current slide had text
+   ***********************************************************************/
+  updateCaption: function () {
+    const slide = OpenLP.currentSlides[OpenLP.currentSlide];
+    const linesElem = $("#lines");
+    const titleElem = $("#song-title");
 
-  // Step 1: Detect if CURRENT slide has text
-  var currentText = getText(OpenLP.currentSlide);
-  var currentHasText = currentText !== "";
+    if (!slide) {
+      linesElem.html("");
+      titleElem.html("");
+      return;
+    }
 
-  // Step 2: Collect up to 4 non-empty lines starting at currentSlide
-  var idx = OpenLP.currentSlide;
-  while (collected.length < 4 && idx < OpenLP.currentSlides.length) {
-    var txt = getText(idx);
-    if (txt !== "") collected.push(txt);
-    idx++;
-  }
+// ----------- IMAGE SUPPORT -----------
+const imgSrc = slide.img || "";
+if (imgSrc.trim() !== "") {
+  // Tell CSS we're in image mode
+  $("#caption-container").addClass("image-mode");
 
-  // Step 3: If nothing exists, show nothing
-  if (collected.length === 0) {
-    $("#lines").html("");
-    $("#song-title").html("");
-    return;
-  }
+  linesElem.html(`
+    <div class="line line-current">
+      <img class="caption-image" src="${imgSrc}">
+    </div>
+  `);
+  titleElem.html(OpenLP.songTitle || "");
+  return;
+}
+// -------------------------------------
 
-  // Step 4: Build final HTML
-  var html = "";
+    // -------------------------------------
 
-  for (var i = 0; i < collected.length; i++) {
-    // If current slide had text → highlight first visible line
-    if (i === 0 && currentHasText)
-      html += `<div class="line line-current">${collected[i]}</div>`;
-    else
-      html += `<div class="line">${collected[i]}</div>`;
-  }
+    // Helper: fetch slide text
+    function getText(idx) {
+      if (!OpenLP.currentSlides[idx]) return "";
+      var t = OpenLP.currentSlides[idx]["text"] || "";
+      return t.replace(/\r/g, "").replace(/\n/g, "<br>").trim();
+    }
 
-  // Step 5: If fewer than 4, pad with blanks
-  while (collected.length < 4) {
-    html += `<div class="line">&nbsp;</div>`;
-    collected.push("");
-  }
+// Ensure normal text mode layout
+$("#caption-container").removeClass("image-mode");
 
-  $("#lines").html(html);
-  $("#song-title").html(OpenLP.songTitle || "");
-},
+var collected = [];
 
+
+    var collected = [];
+
+    // Step 1: Detect if CURRENT slide has text
+    var currentText = getText(OpenLP.currentSlide);
+    var currentHasText = currentText !== "";
+
+    // Step 2: Collect up to 4 non-empty lines starting at currentSlide
+    var idx = OpenLP.currentSlide;
+    while (collected.length < 4 && idx < OpenLP.currentSlides.length) {
+      var txt = getText(idx);
+      if (txt !== "") collected.push(txt);
+      idx++;
+    }
+
+    // Step 3: If nothing exists, clear
+    if (collected.length === 0) {
+      linesElem.html("");
+      titleElem.html("");
+      return;
+    }
+
+    // Step 4: Build final HTML
+    var html = "";
+    for (var i = 0; i < collected.length; i++) {
+      if (i === 0 && currentHasText)
+        html += `<div class="line line-current">${collected[i]}</div>`;
+      else
+        html += `<div class="line">${collected[i]}</div>`;
+    }
+
+    // Step 5: Pad to always show 4 lines
+    while (collected.length < 4) {
+      html += `<div class="line">&nbsp;</div>`;
+      collected.push("");
+    }
+
+    linesElem.html(html);
+    titleElem.html(OpenLP.songTitle || "");
+  },
 
   updateClock: function () {
     var t = new Date();

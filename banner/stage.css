@@ -21,10 +21,7 @@
     "Noto Sans CJK TC",
     sans-serif;
 
-  /* LED panel safe height */
   --banner-height: 192px;
-
-  /* Padding inside banner */
   --vertical-padding: 8px;
 }
 
@@ -38,40 +35,64 @@ html, body {
   font-family: var(--font-stack);
 }
 
-/* Outer container = LED panel area */
 #banner-container {
   width: 100%;
   height: var(--banner-height);
   padding-top: var(--vertical-padding);
   padding-bottom: var(--vertical-padding);
-
   display: flex;
   justify-content: center;
   align-items: center;
+  background: black;
+  position: relative;
   box-sizing: border-box;
 
-  background: black;
+  overflow: hidden;   /* <<<< CRITICAL FIX */
 }
 
-/* Auto scaling single-line text */
-#line-current {
-  color: #ffffff;
-  text-align: center;
+.banner-layer {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  max-width: 100%;     /* <<<< CRITICAL FIX */
+  overflow: hidden;    /* <<<< CRITICAL FIX */
   white-space: nowrap;
+  text-align: center;
 
-  /* Auto-scale using viewport height relative to banner height */
-  /* 192 px → ~100vh of this context, so clamp will scale naturally */
-  font-size: clamp(20px, 16vh, 180px);
-  line-height: 1.0;
+  color: #fff;
   font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.2s linear;
 }
 
-/* If line is empty, hide completely */
-#line-current:empty {
-  display: none;
+
+#banner-layerA { z-index: 1; }
+#banner-layerB { z-index: 2; }
+
+/* Hidden measurement element */
+#text-measure {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+
+  visibility: hidden;
+
+  white-space: nowrap;
+  overflow: visible;
+  text-align: left;
+
+  /* IMPORTANT: do NOT clamp font-size here */
+  font-size: 200px; /* JS will overwrite */
+  line-height: 1;
+  color: #fff;
+  font-weight: 700;
+  font-family: var(--font-stack);
 }
 
-/* Hide OpenLP original elements */
+
+/* Hide OpenLP originals */
 #right, #clock, #notes, #verseorder, #currentslide, #nextslide {
   display: none !important;
 }

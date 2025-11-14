@@ -1,11 +1,15 @@
 /******************************************************************************
- * LED Banner Caption JS (single-line, auto-scaling, 192 px)
+ * LED Banner Caption JS (single-line, auto-scaling, crossfade, stable size)
  ******************************************************************************/
+
+window.bannerFontMax = Infinity;   // global font memory (consistent size)
 
 window.OpenLP = {
   myWebSocket: function () {
     const host = window.location.hostname;
     const websocket_port = 4317;
+
+    window.currentBannerLayer = "A";
 
     ws = new WebSocket(`ws://${host}:${websocket_port}`);
 
@@ -16,11 +20,14 @@ window.OpenLP = {
 
         OpenLP.myTwelve = info.twelve;
 
+        // reset global font max when item changes
         if (OpenLP.currentItem != info.item ||
             OpenLP.currentService != info.service) {
 
           OpenLP.currentItem = info.item;
           OpenLP.currentService = info.service;
+
+          window.bannerFontMax = Infinity;  // RESET FONT SIZE FOR NEW SONG
           OpenLP.loadSlides();
         }
         else if (OpenLP.currentSlide != info.slide) {
@@ -36,12 +43,9 @@ window.OpenLP = {
 
   loadService: function () {
     $.getJSON("/api/v2/service/items", function (data) {
-      data.forEach(function (item) {
-        if (item.selected) {
-          OpenLP.songTitle = item.title || "";
-        }
+      data.forEach(item => {
+        if (item.selected) OpenLP.songTitle = item.title || "";
       });
-
       OpenLP.updateBanner();
     });
   },
@@ -58,34 +62,133 @@ window.OpenLP = {
       OpenLP.loadService();
     });
   },
-/***********************************************************************
- * updateBanner() — Single-line LED caption logic
- * - Show ONLY current slide text
- * - If current slide is empty → show nothing
- ***********************************************************************/
-updateBanner: function () {
-    function getText(idx) {
-      if (!OpenLP.currentSlides[idx]) return "";
-      let t = OpenLP.currentSlides[idx]["text"] || "";
-      return t.replace(/\r/g, "").replace(/\n/g, " ").trim();
+
+  /***********************************************************************
+   * updateBanner() — autoscale + global size memory + perfect crossfade
+   ***********************************************************************/
+  updateBanner: function () {
+
+    let newHtml = "";
+
+    const slide = OpenLP.currentSlides[OpenLP.currentSlide];
+
+    // Blank logic
+    const forceBlank =
+      OpenLP.display === "blank" ||
+      OpenLP.display === "desktop" ||
+      OpenLP.display === "theme" ||
+      OpenLP.isBlank === true;
+
+    if (!forceBlank && slide) {
+
+      const rawText = slide.text || "";
+      const html = slide.html || "";
+      const imgSrc = slide.img || "";
+
+      const hasImage =
+        (imgSrc && imgSrc.trim() !== "") ||
+        html.includes("<img") ||
+        rawText.includes("<img");
+
+      if (!hasImage) {
+        const cleaned = rawText.replace(/\r/g, "").replace(/\n/g, " ").trim();
+        if (cleaned !== "") newHtml = cleaned;
+      }
     }
 
-    // Only use current slide
-    let txt = getText(OpenLP.currentSlide);
+    // Determine active layer
+    const active = (OpenLP.currentBannerLayer === "A")
+      ? "#banner-layerA"
+      : "#banner-layerB";
 
-    // If empty, display nothing
-    if (!txt) {
-      $("#line-current").html("");
-      return;
+    const oldHtml = $(active).html();
+
+    if (oldHtml === newHtml) return;
+
+    // Determine incoming layer (bottom)
+    const bottom = (OpenLP.currentBannerLayer === "A") ? "#banner-layerB" : "#banner-layerA";
+
+    // 1. compute raw autoscale size
+    let rawSize = OpenLP.fitBannerTextToWidth(newHtml);
+
+    // 2. apply global font memory (stable size across lines)
+    let fontSize;
+    if (window.bannerFontMax === Infinity) {
+      // first line sets baseline
+      window.bannerFontMax = rawSize;
+      fontSize = rawSize;
+    } else {
+      // keep consistent appearance
+      fontSize = Math.min(rawSize, window.bannerFontMax);
+      window.bannerFontMax = fontSize;
     }
 
-    // Render text
-    $("#line-current").html(txt);
-},
+    // 3. apply font size ONLY to incoming layer
+    $(bottom).css("font-size", fontSize + "px");
 
+    // 4. perform proper crossfade
+    OpenLP.swapBannerLayers(newHtml, fontSize);
+  },
+
+  /***********************************************************************
+   * swapBannerLayers — final version (no resize of outgoing layer)
+   ***********************************************************************/
+  swapBannerLayers: function(newHtml, fontSize) {
+    const isA = OpenLP.currentBannerLayer === "A";
+    const top = isA ? "#banner-layerA" : "#banner-layerB";   // outgoing
+    const bottom = isA ? "#banner-layerB" : "#banner-layerA"; // incoming
+
+    // 1. prepare incoming layer
+    $(bottom).html(newHtml);
+    $(bottom).css("opacity", 0);  // reset
+    const b = $(bottom)[0];
+    void b.offsetHeight;          // force layout BEFORE transition (critical)
+
+    // 2. fade transition
+    $(top).css("opacity", 0);
+    $(bottom).css("opacity", 1);
+
+    // 3. after fade completes, sync hidden layer WITHOUT flashing
+    setTimeout(() => {
+      $(top).css("font-size", fontSize + "px");
+      $(top).html(newHtml);
+      $(top).css("opacity", 0);
+    }, 100); // slightly > 0.08s fade duration
+
+    // 4. swap active layer
+    OpenLP.currentBannerLayer = isA ? "B" : "A";
+  },
+
+  /***********************************************************************
+   * Width-based autoscaling — corrected measurement logic
+   ***********************************************************************/
+  fitBannerTextToWidth: function (text) {
+    const measure = $("#text-measure");
+
+    const maxWidth = $("#banner-container").width();
+    const targetWidth = maxWidth - 0;  // no padding limit
+
+    // Start big (banner is 192px tall)
+    let size = $("#banner-container").height() - 5;
+
+    measure.css("font-size", size + "px");
+    measure.html(text);
+
+    // shrink until it fits or hit LED minimum
+    while (measure[0].getBoundingClientRect().width > targetWidth && size > 60) {
+      size -= 4;
+      measure.css("font-size", size + "px");
+    }
+
+    return size;
+  },
 
   updateClock: function () {}
 };
+
+$(window).on("resize", () => {
+  OpenLP.updateBanner();
+});
 
 $.ajaxSetup({ cache: false });
 OpenLP.myWebSocket();
