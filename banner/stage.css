@@ -40,6 +40,8 @@ html, body {
   height: var(--banner-height);
   padding-top: var(--vertical-padding);
   padding-bottom: var(--vertical-padding);
+  padding-left: 150PX;
+  padding-right: 150px;
   display: flex;
   justify-content: center;
   align-items: center;
