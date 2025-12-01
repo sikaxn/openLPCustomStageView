@@ -1,5 +1,5 @@
 /******************************************************************************
- * LED BANNER VIEW (192 px tall, center aligned, single-line current lyric)
+ * LED BANNER VIEW (192 px tall, center aligned, supports up to two lines)
  ******************************************************************************/
 
 @font-face {
@@ -23,6 +23,7 @@
 
   --banner-height: 192px;
   --vertical-padding: 8px;
+  --horizontal-padding: 150px;
 }
 
 html, body {
@@ -40,8 +41,8 @@ html, body {
   height: var(--banner-height);
   padding-top: var(--vertical-padding);
   padding-bottom: var(--vertical-padding);
-  padding-left: 150PX;
-  padding-right: 150px;
+  padding-left: var(--horizontal-padding);
+  padding-right: var(--horizontal-padding);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -59,7 +60,14 @@ html, body {
   width: 100%;
   max-width: 100%;     /* <<<< CRITICAL FIX */
   overflow: hidden;    /* <<<< CRITICAL FIX */
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding-left: var(--horizontal-padding);
+  padding-right: var(--horizontal-padding);
+  box-sizing: border-box;
+  white-space: pre-line;
   text-align: center;
 
   color: #fff;
@@ -81,9 +89,10 @@ html, body {
 
   visibility: hidden;
 
-  white-space: nowrap;
+  white-space: pre-line;
   overflow: visible;
-  text-align: left;
+  text-align: center;
+  display: inline-block;
 
   /* IMPORTANT: do NOT clamp font-size here */
   font-size: 200px; /* JS will overwrite */

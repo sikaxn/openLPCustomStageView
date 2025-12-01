@@ -1,5 +1,5 @@
 /******************************************************************************
- * LED Banner Caption JS (single-line, auto-scaling, crossfade, stable size)
+ * LED Banner Caption JS (single- or two-line, auto-scaling, crossfade, stable size)
  ******************************************************************************/
 
 window.bannerFontMax = Infinity;   // global font memory (consistent size)
@@ -91,8 +91,14 @@ window.OpenLP = {
         rawText.includes("<img");
 
       if (!hasImage) {
-        const cleaned = rawText.replace(/\r/g, "").replace(/\n/g, " ").trim();
-        if (cleaned !== "") newHtml = cleaned;
+        const lines = rawText
+          .replace(/\r/g, "")
+          .split("\n")
+          .map(line => line.trim())
+          .filter(line => line !== "");
+
+        const clipped = lines.slice(0, 2);
+        if (clipped.length > 0) newHtml = clipped.join("<br>");
       }
     }
 
@@ -164,19 +170,33 @@ window.OpenLP = {
    ***********************************************************************/
   fitBannerTextToWidth: function (text) {
     const measure = $("#text-measure");
+    const container = $("#banner-container");
 
-    const maxWidth = $("#banner-container").width();
-    const targetWidth = maxWidth - 0;  // no padding limit
+    const styles = getComputedStyle(document.documentElement);
+    const maxWidth = container.width();
+    const paddingStr = styles.getPropertyValue("--vertical-padding") || "0";
+    const padding = parseFloat(paddingStr) || 0;
+    const paddingHStr = styles.getPropertyValue("--horizontal-padding") || "0";
+    const paddingH = parseFloat(paddingHStr) || 0;
+    const availableWidth = Math.max(0, maxWidth - paddingH * 2);
+    const maxHeight = container.height() - padding * 2;
 
-    // Start big (banner is 192px tall)
-    let size = $("#banner-container").height() - 5;
+    let size = maxHeight; // start from available vertical space
+    const minSize = 32;
 
-    measure.css("font-size", size + "px");
-    measure.html(text);
+    measure.css({
+      "font-size": size + "px",
+      "max-width": availableWidth + "px",
+      "white-space": "pre-line",
+      "display": "inline-block",
+      "text-align": "center"
+    });
+    measure.html(text || "");
 
-    // shrink until it fits or hit LED minimum
-    while (measure[0].getBoundingClientRect().width > targetWidth && size > 60) {
-      size -= 4;
+    const box = () => measure[0].getBoundingClientRect();
+
+    while ((box().width > maxWidth || box().height > maxHeight) && size > minSize) {
+      size -= 2;
       measure.css("font-size", size + "px");
     }
 
