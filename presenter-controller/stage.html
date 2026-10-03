@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#111820">
+  <title>Presenter Controller</title>
+  <link rel="stylesheet" href="/stage/presenter-controller/stage.css">
+</head>
+<body>
+  <header class="topbar"><h1>Presenter Controller</h1><span id="connection" role="status">Connecting…</span></header>
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Slides">
+      <div class="list-heading"><strong>Slides</strong><button id="follow" type="button" title="Scroll to the current slide">Go to current</button></div>
+      <div id="slides" class="slides"><p class="empty">Waiting for OpenLP…</p></div>
+    </aside>
+    <section class="presenter" aria-label="Current slide">
+      <div class="slide-heading"><span class="eyebrow">CURRENT SLIDE</span><span id="position">—</span><h2 id="title">Waiting for OpenLP</h2></div>
+      <div id="preview" class="preview"><img id="preview-image" alt="Current slide preview" hidden><div id="preview-text">Your live slide will appear here.</div></div>
+      <div id="display-state" class="display-state" role="status">Checking display…</div>
+      <div id="message" class="message" role="alert" hidden></div>
+      <form id="login" class="login" hidden>
+        <label>Username <input id="username" autocomplete="username" autocapitalize="none" required></label>
+        <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Sign in</button>
+      </form>
+      <nav class="controls" aria-label="Presentation controls">
+        <button id="previous" type="button" disabled><span aria-hidden="true">&#9664;</span> Previous</button>
+        <button id="next" class="primary" type="button" disabled>Next <span aria-hidden="true">&#9654;</span></button>
+        <button id="blank" type="button" aria-pressed="false" disabled>Blank screen</button>
+      </nav>
+    </section>
+  </main>
+  <noscript>This controller needs JavaScript enabled to connect to OpenLP.</noscript>
+  <script src="/stage/presenter-controller/stage.js"></script>
+</body>
+</html>
