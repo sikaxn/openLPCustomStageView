@@ -7,11 +7,18 @@ button:active { background: #3a4c60; }
 button:focus, input:focus { outline: 3px solid #75c8ff; outline-offset: -3px; }
 button:disabled { opacity: .4; cursor: default; }
 [hidden] { display: none !important; }
-.topbar { height: 56px; padding: 0 20px; border-bottom: 1px solid #344150; display: flex; align-items: center; justify-content: space-between; }
+.topbar { height: 64px; padding: 0 20px; border-bottom: 1px solid #344150; display: flex; align-items: center; justify-content: space-between; }
+.topbar-title, .topbar-tools { display: flex; align-items: center; min-width: 0; }
+.topbar-title { margin-right: 16px; }
+.topbar-tools { flex-shrink: 0; }
+.datetime { display: block; text-align: right; margin-right: 16px; font-size: 12px; color: #a9bbcb; white-space: nowrap; }
+.datetime span { display: block; }
+#time { font-size: 17px; font-weight: 600; color: #edf2f7; font-variant-numeric: tabular-nums; }
+#fullscreen { padding: 8px 14px; min-height: 48px; font-size: 14px; }
 h1 { font-size: 18px; margin: 0; font-weight: 600; }
 #connection { font-size: 13px; color: #f4c677; margin-left: 12px; }
 #connection.connected { color: #83dfbf; }
-.workspace { height: calc(100% - 56px); display: flex; }
+.workspace { height: calc(100% - 64px); display: flex; }
 .sidebar { width: 28%; min-width: 150px; max-width: 340px; display: flex; flex-direction: column; border-right: 1px solid #344150; background: #17212c; }
 .list-heading { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; flex-shrink: 0; }
 .list-heading button { font-size: 12px; padding: 5px 9px; margin-left: 8px; }
@@ -38,13 +45,17 @@ h2 { margin: 5px 0 0; font-size: 20px; font-weight: 500; white-space: nowrap; ov
 #blank[aria-pressed="true"] { background: #755022; border-color: #dfac63; }
 .empty { padding: 10px; color: #a9bbcb; }
 .message { color: #ffd18b; font-size: 14px; padding: 6px 0; }
+.control-lock { flex-shrink: 0; padding: 12px; margin-bottom: 12px; border: 1px solid #dfac63; border-radius: 8px; background: #44321e; color: #ffdba6; font-size: 15px; }
 .login { flex-shrink: 0; padding-bottom: 10px; }
 .login label { display: inline-block; font-size: 12px; margin-right: 8px; }
 .login input { display: block; width: 145px; min-height: 44px; color: #fff; background: #202c39; border: 1px solid #64778b; border-radius: 4px; padding: 6px; }
 .login button { padding: 6px 16px; }
 @media (max-width: 600px) {
-  .topbar { padding: 0 10px; height: 48px; } h1 { font-size: 15px; } #connection { font-size: 11px; }
-  .workspace { height: calc(100% - 48px); } .sidebar { width: 30%; min-width: 110px; }
+  .topbar { padding: 6px 10px; height: 96px; flex-wrap: wrap; } h1 { font-size: 15px; } #connection { font-size: 11px; }
+  .topbar-title { width: 100%; margin-right: 0; justify-content: space-between; }
+  .topbar-tools { width: 100%; justify-content: space-between; }
+  .datetime { text-align: left; margin-right: 8px; }
+  .workspace { height: calc(100% - 96px); } .sidebar { width: 30%; min-width: 110px; }
   .list-heading { padding: 8px 6px; display: block; } .list-heading strong { display: none; } .list-heading button { width: 100%; margin: 0; }
   .slides { padding: 0 5px 10px; } .slide { padding: 5px; } .slide-copy { font-size: 12px; }
   .presenter { padding: 12px 10px; } h2 { font-size: 16px; } #preview-text { font-size: 23px; padding: 12px; }
@@ -53,7 +64,6 @@ h2 { margin: 5px 0 0; font-size: 20px; font-weight: 500; white-space: nowrap; ov
   .eyebrow { letter-spacing: 1px; font-size: 9px; } #position { font-size: 12px; }
 }
 @media (max-height: 450px) {
-  .topbar { height: 38px; } .workspace { height: calc(100% - 38px); }
   .presenter { padding: 8px 12px; } .slide-heading { margin-bottom: 6px; } h2 { font-size: 15px; margin-top: 0; }
   .controls button { min-height: 48px; } .display-state { padding: 4px 0; } #preview-text { font-size: 24px; padding: 12px; }
 }

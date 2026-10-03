@@ -4,12 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Presenter Controller">
   <meta name="theme-color" content="#111820">
   <title>Presenter Controller</title>
   <link rel="stylesheet" href="/stage/presenter-controller/stage.css">
 </head>
 <body>
-  <header class="topbar"><h1>Presenter Controller</h1><span id="connection" role="status">Connecting…</span></header>
+  <header class="topbar">
+    <div class="topbar-title"><h1>Presenter Controller</h1><span id="connection" role="status">Connecting…</span></div>
+    <div class="topbar-tools">
+      <time id="datetime" class="datetime"><span id="date"></span><span id="time"></span></time>
+      <button id="fullscreen" type="button" aria-pressed="false">Fullscreen</button>
+    </div>
+  </header>
   <main class="workspace">
     <aside class="sidebar" aria-label="Slides">
       <div class="list-heading"><strong>Slides</strong><button id="follow" type="button" title="Scroll to the current slide">Go to current</button></div>
@@ -17,9 +24,11 @@
     </aside>
     <section class="presenter" aria-label="Current slide">
       <div class="slide-heading"><span class="eyebrow">CURRENT SLIDE</span><span id="position">—</span><h2 id="title">Waiting for OpenLP</h2></div>
+      <div id="control-lock" class="control-lock" role="status" hidden></div>
       <div id="preview" class="preview"><img id="preview-image" alt="Current slide preview" hidden><div id="preview-text">Your live slide will appear here.</div></div>
       <div id="display-state" class="display-state" role="status">Checking display…</div>
       <div id="message" class="message" role="alert" hidden></div>
+      <div id="fullscreen-help" class="message" role="status" hidden></div>
       <form id="login" class="login" hidden>
         <label>Username <input id="username" autocomplete="username" autocapitalize="none" required></label>
         <label>Password <input id="password" type="password" autocomplete="current-password" required></label>

@@ -1,10 +1,48 @@
 /* ES5 and XMLHttpRequest for older iOS / Android browsers. No dependencies. */
 (function () {
   'use strict';
-  var slides = [], current = -1, itemKey = null, state = null;
+  var slides = [], current = -1, itemKey = null, state = null, liveMedia = false;
   var online = false, busy = false, loading = false, token = '', timer, failures = 0, unlock = false;
   function el(id) { return document.getElementById(id); }
   function say(text) { el('message').textContent = text; el('message').hidden = !text; }
+  function updateClock() {
+    var now = new Date();
+    el('datetime').setAttribute('datetime', now.toISOString());
+    el('date').textContent = now.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+    el('time').textContent = now.toLocaleTimeString();
+  }
+  function fullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.webkitCurrentFullScreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+  }
+  function fullscreenHint(text) {
+    el('fullscreen-help').textContent = text;
+    el('fullscreen-help').hidden = !text;
+  }
+  function updateFullscreen() {
+    var standalone = !!window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    var active = !!fullscreenElement();
+    el('fullscreen').textContent = standalone ? 'App mode' : (active ? 'Exit fullscreen' : 'Fullscreen');
+    el('fullscreen').setAttribute('aria-pressed', active || standalone ? 'true' : 'false');
+    el('fullscreen').disabled = !!standalone;
+    if (active || standalone) { fullscreenHint(''); }
+  }
+  el('fullscreen').onclick = function () {
+    var root = document.documentElement, active = !!fullscreenElement();
+    var action = active ? (document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen || document.mozCancelFullScreen || document.msExitFullscreen) :
+      (root.requestFullscreen || root.webkitRequestFullscreen || root.webkitRequestFullScreen || root.mozRequestFullScreen || root.msRequestFullscreen);
+    if (!action) {
+      fullscreenHint('For fullscreen on an older iPad, open this page in Safari, tap Share, choose Add to Home Screen, then open Presenter Controller from the Home Screen.');
+      return;
+    }
+    fullscreenHint('');
+    try {
+      var result = action.call(active ? document : root);
+      if (result && result.then) { result.then(updateFullscreen, function () { fullscreenHint('Fullscreen could not open. On iPad, use Safari’s Share > Add to Home Screen, then open the saved app.'); }); }
+    } catch (error) { fullscreenHint('Fullscreen is unavailable. On iPad, use Safari’s Share > Add to Home Screen, then open the saved app.'); }
+  };
+  var fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'];
+  for (var f = 0; f < fullscreenEvents.length; f++) { document.addEventListener(fullscreenEvents[f], updateFullscreen, false); }
+  document.addEventListener('fullscreenerror', function () { fullscreenHint('Fullscreen is unavailable. On iPad, use Safari’s Share > Add to Home Screen, then open the saved app.'); }, false);
   function request(method, path, body, done) {
     var xhr = new XMLHttpRequest(), finished = false;
     function finish(error, data) { if (!finished) { finished = true; done(error, data); } }
@@ -22,8 +60,18 @@
     xhr.onerror = xhr.ontimeout = function () { finish(-1); };
     xhr.send(body ? JSON.stringify(body) : null);
   }
+  function lockReason() {
+    if (state && state.display) { return 'The AV room now has control while the desktop is showing. Presentation controls will resume automatically when the AV room returns to text or slides.'; }
+    if (liveMedia) { return 'The AV room now has control while media is live. Presentation controls will resume automatically when the AV room returns to text or slides.'; }
+    return '';
+  }
   function controls() {
-    var disabled = !online || busy || loading || !!(state && state.isSecure && !token);
+    var reason = lockReason();
+    el('control-lock').textContent = reason;
+    el('control-lock').hidden = !reason;
+    el('follow').disabled = !!reason;
+    el('login').hidden = !!reason || !(state && state.isSecure && !token);
+    var disabled = !!reason || !online || busy || loading || !!(state && state.isSecure && !token);
     el('previous').disabled = disabled || current <= 0;
     el('next').disabled = disabled || current < 0 || current >= slides.length - 1;
     el('blank').disabled = disabled || !state;
@@ -71,6 +119,9 @@
     this.hidden = true; el('preview-text').hidden = false;
   };
   function build(data) {
+    /* OpenLP's RequiresMedia capability is 4. Playback state is not exposed,
+       so keep the lock for the entire time a media item is live. */
+    liveMedia = data.name === 'media' || (data.capabilities || []).indexOf(4) !== -1;
     slides = data.slides || [];
     el('title').textContent = data.title || 'No live item';
     var list = el('slides');
@@ -125,7 +176,7 @@
     });
   }
   function command(path, body) {
-    if (!online || busy || loading || (state && state.isSecure && !token)) { return; }
+    if (lockReason() || !online || busy || loading || (state && state.isSecure && !token)) { return; }
     busy = true; controls(); say('');
     request('POST', 'v2/' + path, body, function (error) {
       if (error === 401 || error === 403) { token = ''; el('login').hidden = false; say('Sign in with your OpenLP remote credentials.'); }
@@ -137,9 +188,10 @@
   el('previous').onclick = function () { if (current > 0) { command('controller/progress', { action: 'previous' }); } };
   el('next').onclick = function () { if (current < slides.length - 1) { command('controller/progress', { action: 'next' }); } };
   el('blank').onclick = function () { if (state) { command('core/display', { display: state.blank ? 'show' : 'blank' }); } };
-  el('follow').onclick = follow;
+  el('follow').onclick = function () { if (!lockReason()) { follow(); } };
   el('login').onsubmit = function (event) {
     event.preventDefault();
+    if (lockReason()) { return; }
     request('POST', 'v2/core/login', { username: el('username').value, password: el('password').value }, function (error, data) {
       el('password').value = '';
       if (error || !data || !data.token) { say('Sign-in failed. Check your credentials and connection.'); return; }
@@ -147,5 +199,8 @@
     });
   };
   window.addEventListener('resize', follow, false);
+  updateClock();
+  setInterval(updateClock, 1000);
+  updateFullscreen();
   poll();
 }());
