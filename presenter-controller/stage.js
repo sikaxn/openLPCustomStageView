@@ -1,7 +1,7 @@
 /* ES5 and XMLHttpRequest for older iOS / Android browsers. No dependencies. */
 (function () {
   'use strict';
-  var slides = [], current = -1, itemKey = null, state = null, liveMedia = false;
+  var slides = [], current = -1, itemKey = null, state = null, liveMedia = false, previewSlideKey = null;
   var online = false, busy = false, loading = false, token = '', timer, failures = 0, unlock = false;
   function el(id) { return document.getElementById(id); }
   function say(text) { el('message').textContent = text; el('message').hidden = !text; }
@@ -98,6 +98,12 @@
   }
   function show(index, force) {
     var changed = index !== current;
+    var slideKey = String(state && state.item) + ':' + index;
+    if (slideKey !== previewSlideKey) {
+      if (window.PresenterPreview) { window.PresenterPreview.reset(); }
+      el('preview-text').scrollTop = 0;
+      previewSlideKey = slideKey;
+    }
     current = index;
     for (var i = 0; i < slides.length; i++) {
       var row = el('slide-' + i);

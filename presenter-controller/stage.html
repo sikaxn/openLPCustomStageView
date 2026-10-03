@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Presenter Controller">
   <meta name="theme-color" content="#111820">
@@ -25,7 +25,14 @@
     <section class="presenter" aria-label="Current slide">
       <div class="slide-heading"><span class="eyebrow">CURRENT SLIDE</span><span id="position">—</span><h2 id="title">Waiting for OpenLP</h2></div>
       <div id="control-lock" class="control-lock" role="status" hidden></div>
-      <div id="preview" class="preview"><img id="preview-image" alt="Current slide preview" hidden><div id="preview-text">Your live slide will appear here.</div></div>
+      <div id="preview" class="preview" aria-label="Slide preview. Pinch to zoom, then drag to move.">
+        <div id="preview-content" class="preview-content"><img id="preview-image" alt="Current slide preview" draggable="false" hidden><div id="preview-text">Your live slide will appear here.</div></div>
+        <div id="preview-zoom" class="preview-zoom" role="group" aria-label="Preview zoom">
+          <button id="zoom-out" type="button" aria-label="Zoom preview out" disabled>−</button>
+          <button id="zoom-reset" type="button" aria-label="Reset preview zoom">100%</button>
+          <button id="zoom-in" type="button" aria-label="Zoom preview in">+</button>
+        </div>
+      </div>
       <div id="display-state" class="display-state" role="status">Checking display…</div>
       <div id="message" class="message" role="alert" hidden></div>
       <div id="fullscreen-help" class="message" role="status" hidden></div>
@@ -42,6 +49,7 @@
     </section>
   </main>
   <noscript>This controller needs JavaScript enabled to connect to OpenLP.</noscript>
+  <script src="/stage/presenter-controller/preview.js"></script>
   <script src="/stage/presenter-controller/stage.js"></script>
 </body>
 </html>
