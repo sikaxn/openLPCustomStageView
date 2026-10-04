@@ -8,7 +8,7 @@
   var plus = document.getElementById('zoom-in');
   var minus = document.getElementById('zoom-out');
   var reset = document.getElementById('zoom-reset');
-  var scale = 1, x = 0, y = 0, gesture = null, mouse = null;
+  var scale = 1, x = 0, y = 0, gesture = null, mouse = null, enabled = true;
   var tap = null, lastTap = 0, outsideTap = 0, touchOptions = false;
 
   /* Old browsers take a boolean; modern browsers need explicit passive:false. */
@@ -33,8 +33,9 @@
     content.style.webkitTransform = transform;
     preview.className = 'preview' + (scale > 1 ? ' zoomed' : '');
     reset.textContent = Math.round(scale * 100) + '%';
-    minus.disabled = scale <= 1;
-    plus.disabled = scale >= 4;
+    minus.disabled = !enabled || scale <= 1;
+    plus.disabled = !enabled || scale >= 4;
+    reset.disabled = !enabled;
   }
   function resetZoom() {
     scale = 1; x = 0; y = 0; gesture = null; mouse = null; tap = null; lastTap = 0;
@@ -42,6 +43,7 @@
     draw();
   }
   function zoomTo(value, px, py) {
+    if (!enabled) { return; }
     var next = clamp(value, 1, 4);
     x = px - (px - x) * next / scale;
     y = py - (py - y) * next / scale;
@@ -82,7 +84,7 @@
   }
   listen(preview, 'touchstart', function (event) {
     if (inside(event.target, tools)) { return; }
-    if (event.touches.length >= 2) { prevent(event); beginPinch(event.touches); }
+    if (event.touches.length >= 2) { prevent(event); if (enabled) { beginPinch(event.touches); } }
     else if (event.touches.length === 1) {
       var p = point(event.touches[0]);
       tap = { x: p.x, y: p.y, time: Date.now() };
@@ -97,6 +99,7 @@
     }
     if (event.touches.length >= 2) {
       prevent(event);
+      if (!enabled) { return; }
       /* A slide change cancels the ongoing gesture until fingers are lifted. */
       if (!gesture) { return; }
       if (gesture.type !== 'pinch') { beginPinch(event.touches); }
@@ -130,7 +133,7 @@
     prevent(event); var p = point(event); zoomTo(scale > 1 ? 1 : 2, p.x, p.y);
   });
   listen(preview, 'mousedown', function (event) {
-    if (scale <= 1 || event.button !== 0 || inside(event.target, tools)) { return; }
+    if (!enabled || scale <= 1 || event.button !== 0 || inside(event.target, tools)) { return; }
     prevent(event); var p = point(event); mouse = { px: p.x, py: p.y, x: x, y: y };
   });
   listen(document, 'mousemove', function (event) { if (mouse) { prevent(event); panTo(point(event), mouse); } });
@@ -160,6 +163,9 @@
     if ((event.ctrlKey || event.metaKey) && (event.key === '+' || event.key === '=' || event.key === '-' || event.key === '0' || event.keyCode === 187 || event.keyCode === 189 || event.keyCode === 48)) { prevent(event); }
   });
   window.addEventListener('resize', function () { gesture = null; mouse = null; draw(); }, false);
-  window.PresenterPreview = { reset: resetZoom };
+  window.PresenterPreview = {
+    reset: resetZoom,
+    setEnabled: function (value) { enabled = value === true; tools.hidden = !enabled; if (!enabled) { resetZoom(); } else { draw(); } }
+  };
   resetZoom();
 }());

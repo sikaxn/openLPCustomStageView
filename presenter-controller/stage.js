@@ -3,8 +3,94 @@
   'use strict';
   var slides = [], current = -1, itemKey = null, state = null, liveMedia = false, previewSlideKey = null;
   var online = false, busy = false, loading = false, token = '', timer, failures = 0, unlock = false;
+  var config = { lock_on_show_desktop: true, fetch_interval_ms: 800, allow_zoom: true, companion_ip: '10.0.0.155', companion_port: 8000, lock_on_companion_hold: true };
+  var configReady = false, companionMode = null, companionUnavailable = false, companionFailures = 0;
   function el(id) { return document.getElementById(id); }
   function say(text) { el('message').textContent = text; el('message').hidden = !text; }
+  function normalizeConfig(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) { throw new Error('config.json must contain an object.'); }
+    var result = {}, key;
+    for (key in config) {
+      if (Object.prototype.hasOwnProperty.call(config, key)) {
+        result[key] = Object.prototype.hasOwnProperty.call(data, key) ? data[key] : config[key];
+      }
+    }
+    var flags = ['lock_on_show_desktop', 'allow_zoom', 'lock_on_companion_hold'];
+    for (var i = 0; i < flags.length; i++) {
+      if (typeof result[flags[i]] !== 'boolean') { throw new Error(flags[i] + ' must be true or false.'); }
+    }
+    if (typeof result.fetch_interval_ms !== 'number' || result.fetch_interval_ms % 1 !== 0 || result.fetch_interval_ms < 100 || result.fetch_interval_ms > 60000) {
+      throw new Error('fetch_interval_ms must be a whole number from 100 to 60000.');
+    }
+    if (typeof result.companion_port !== 'number' || result.companion_port % 1 !== 0 || result.companion_port < 1 || result.companion_port > 65535) {
+      throw new Error('companion_port must be a whole number from 1 to 65535.');
+    }
+    if (typeof result.companion_ip !== 'string') { throw new Error('companion_ip must be a string.'); }
+    result.companion_ip = result.companion_ip.replace(/^\s+|\s+$/g, '');
+    var host = result.companion_ip;
+    if (host && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(host) && !/^\[[0-9a-f:]+\]$/i.test(host) && !/^[0-9a-f]*:[0-9a-f:]*:[0-9a-f:]*$/i.test(host)) {
+      throw new Error('companion_ip must be an IP address or hostname, without a URL or port.');
+    }
+    return result;
+  }
+  function loadConfig() {
+    var xhr = new XMLHttpRequest(), finished = false;
+    function finish(error) {
+      if (finished) { return; }
+      finished = true;
+      if (error) {
+        el('config-warning').textContent = 'Config could not be loaded. Built-in settings are in use. ' + error;
+        el('config-warning').hidden = false;
+      }
+      configReady = true;
+      if (window.PresenterPreview) { window.PresenterPreview.setEnabled(config.allow_zoom); }
+      controls(); updateCompanionStatus();
+      if (config.lock_on_companion_hold) { pollCompanion(); }
+      poll();
+    }
+    xhr.open('GET', '/stage/presenter-controller/config.json?_=' + Date.now(), true);
+    xhr.timeout = 10000;
+    xhr.onload = function () {
+      if (xhr.status < 200 || xhr.status >= 300) { finish('Check config.json in the stage folder.'); return; }
+      try { config = normalizeConfig(JSON.parse(xhr.responseText)); } catch (error) { finish(error.message); return; }
+      finish('');
+    };
+    xhr.onerror = xhr.ontimeout = function () { finish('Check the connection to OpenLP.'); };
+    xhr.send(null);
+  }
+  function updateCompanionStatus() {
+    el('companion-state').hidden = !config.lock_on_companion_hold;
+    var mode = companionMode === 0 ? 'Hold' : (companionMode === 1 ? 'Ready' : (companionMode === 3 ? 'Wait' : 'Unknown'));
+    el('companion-state').textContent = companionUnavailable ? 'Companion: unavailable' + (companionMode !== null ? ' · last mode: ' + mode : '') : 'Companion: ' + mode;
+    el('companion-state').className = 'companion-state' + (companionUnavailable ? '' : ' ' + mode.toLowerCase());
+  }
+  function pollCompanion() {
+    var xhr = new XMLHttpRequest(), finished = false;
+    var host = config.companion_ip || window.location.hostname;
+    if (host.indexOf(':') !== -1 && host.charAt(0) !== '[') { host = '[' + host + ']'; }
+    function finish(error) {
+      if (finished) { return; }
+      finished = true;
+      companionUnavailable = !!error;
+      if (error) { companionFailures++; companionMode = null; }
+      else {
+        companionFailures = 0;
+        var value = xhr.responseText.replace(/^\s+|\s+$/g, '');
+        try { value = JSON.parse(value); } catch (ignore) { /* Companion also returns plain text. */ }
+        companionMode = value === 0 || value === '0' ? 0 : (value === 1 || value === '1' ? 1 : (value === 3 || value === '3' ? 3 : null));
+      }
+      updateCompanionStatus(); controls();
+      setTimeout(pollCompanion, companionFailures ? Math.max(config.fetch_interval_ms, Math.min(5000, companionFailures * 1000)) : config.fetch_interval_ms);
+    }
+    try {
+      xhr.open('GET', 'http://' + host + ':' + config.companion_port + '/api/custom-variable/ready/value?_=' + Date.now(), true);
+      xhr.timeout = 3000;
+      /* No OpenLP token or custom headers: this is a simple cross-origin GET. */
+      xhr.onload = function () { finish(xhr.status < 200 || xhr.status >= 300); };
+      xhr.onerror = xhr.ontimeout = function () { finish(true); };
+      xhr.send(null);
+    } catch (error) { finish(true); }
+  }
   function updateClock() {
     var now = new Date();
     el('datetime').setAttribute('datetime', now.toISOString());
@@ -61,17 +147,18 @@
     xhr.send(body ? JSON.stringify(body) : null);
   }
   function lockReason() {
-    if (state && state.display) { return 'The AV room now has control while the desktop is showing. Presentation controls will resume automatically when the AV room returns to text or slides.'; }
-    if (liveMedia) { return 'The AV room now has control while media is live. Presentation controls will resume automatically when the AV room returns to text or slides.'; }
+    if (config.lock_on_companion_hold && companionMode === 0) { return 'The AV room now has control. Presenter controls are on Hold.'; }
+    if (config.lock_on_show_desktop && state && state.display) { return 'The AV room now has control while the desktop is showing.'; }
+    if (liveMedia) { return 'The AV room now has control while media is live.'; }
     return '';
   }
   function controls() {
     var reason = lockReason();
     el('control-lock').textContent = reason;
     el('control-lock').hidden = !reason;
-    el('follow').disabled = !!reason;
+    el('follow').disabled = false;
     el('login').hidden = !!reason || !(state && state.isSecure && !token);
-    var disabled = !!reason || !online || busy || loading || !!(state && state.isSecure && !token);
+    var disabled = !configReady || !!reason || !online || busy || loading || !!(state && state.isSecure && !token);
     el('previous').disabled = disabled || current <= 0;
     el('next').disabled = disabled || current < 0 || current >= slides.length - 1;
     el('blank').disabled = disabled || !state;
@@ -156,7 +243,7 @@
     for (var j = 0; j < slides.length; j++) { if (slides[j].selected) { selected = j; break; } }
     show(selected >= 0 ? selected : (slides.length ? 0 : -1), true);
   }
-  function schedule() { clearTimeout(timer); timer = setTimeout(poll, failures ? Math.min(5000, failures * 1000) : 800); }
+  function schedule() { clearTimeout(timer); timer = setTimeout(poll, failures ? Math.max(config.fetch_interval_ms, Math.min(5000, failures * 1000)) : config.fetch_interval_ms); }
   function poll() {
     clearTimeout(timer);
     var unlockThisPoll = unlock;
@@ -182,7 +269,7 @@
     });
   }
   function command(path, body) {
-    if (lockReason() || !online || busy || loading || (state && state.isSecure && !token)) { return; }
+    if (!configReady || lockReason() || !online || busy || loading || (state && state.isSecure && !token)) { return; }
     busy = true; controls(); say('');
     request('POST', 'v2/' + path, body, function (error) {
       if (error === 401 || error === 403) { token = ''; el('login').hidden = false; say('Sign in with your OpenLP remote credentials.'); }
@@ -194,7 +281,7 @@
   el('previous').onclick = function () { if (current > 0) { command('controller/progress', { action: 'previous' }); } };
   el('next').onclick = function () { if (current < slides.length - 1) { command('controller/progress', { action: 'next' }); } };
   el('blank').onclick = function () { if (state) { command('core/display', { display: state.blank ? 'show' : 'blank' }); } };
-  el('follow').onclick = function () { if (!lockReason()) { follow(); } };
+  el('follow').onclick = follow;
   el('login').onsubmit = function (event) {
     event.preventDefault();
     if (lockReason()) { return; }
@@ -208,5 +295,6 @@
   updateClock();
   setInterval(updateClock, 1000);
   updateFullscreen();
-  poll();
+  if (window.PresenterPreview) { window.PresenterPreview.setEnabled(false); }
+  loadConfig();
 }());
