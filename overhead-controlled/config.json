@@ -1,0 +1,14 @@
+{
+  "screen_id": "overhead",
+  "screen_name": "Overhead",
+  "service_name": "",
+  "companion_ip": "10.0.0.155",
+  "companion_port": 8000,
+  "poll_interval_ms": 300,
+  "openlp_fallback_poll_ms": 200,
+  "pyssp_fallback_poll_ms": 200,
+  "sources": [
+    { "id": 0, "type": "openlp", "host": "", "port": 4316 },
+    { "id": 1, "type": "pyssp", "host": "10.0.0.155", "port": 5050 }
+  ]
+}
