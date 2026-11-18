@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,10 +49,15 @@ def expected_buttons() -> list[tuple[int, int, str, list[tuple[str, str, bool]],
                 (row, 5, f"{label}\npySSP 1", [action(prefix + "source", "1")], 0x306D73),
             ]
         )
-    source_variables = [
-        f"stage_{json.loads((ROOT / folder / 'config.json').read_text(encoding='utf-8'))['screen_id']}_source"
+    screen_ids = [
+        json.loads((ROOT / folder / "config.json").read_text(encoding="utf-8"))["screen_id"]
         for folder, _label in VIEWS
     ]
+    mode_variables = [f"stage_{screen_id}_mode" for screen_id in screen_ids]
+    source_variables = [f"stage_{screen_id}_source" for screen_id in screen_ids]
+    buttons.append((0, 7, "ALL\nLyrics", [action(name, "lyrics") for name in mode_variables], 0x176544))
+    buttons.append((1, 7, "ALL\nTitle", [action(name, "title") for name in mode_variables], 0x225B87))
+    buttons.append((2, 7, "ALL\nBlank", [action(name, "blank") for name in mode_variables], 0x822A34))
     buttons.append((0, 8, "ALL\nSource 0", [action(name, "0") for name in source_variables], 0x4B5056))
     buttons.append((1, 8, "ALL\npySSP 1", [action(name, "1") for name in source_variables], 0x306D73))
     buttons.append(
@@ -104,6 +110,102 @@ def current_text(config: dict) -> str | None:
 
 def current_actions(config: dict) -> list[dict]:
     return config.get("steps", {}).get("0", {}).get("action_sets", {}).get("down", [])
+
+
+def feedback_spec(specs: list[tuple[str, str, bool]]) -> tuple[str, dict, int] | None:
+    if len(specs) == 1 and specs[0][0] == "stage_force_refresh":
+        return None
+    value = specs[0][1]
+    active_colors = {
+        "lyrics": 0x36D978,
+        "title": 0x53B4F5,
+        "blank": 0xFF6473,
+        "0": 0xD2E0EE,
+        "1": 0x3BDACB,
+    }
+    if value not in active_colors or any(item[1] != value or item[2] for item in specs):
+        raise RuntimeError(f"Cannot make feedback for actions {specs!r}")
+    if len(specs) == 1:
+        return "variable_value", {
+            "variable": {"value": f"custom:{specs[0][0]}", "isExpression": False},
+            "op": {"value": "eq", "isExpression": False},
+            "value": {"value": value, "isExpression": False},
+        }, active_colors[value]
+    expression = " && ".join(f"$(custom:{name}) == {json.dumps(value)}" for name, _value, _expression in specs)
+    return "check_expression", {
+        "expression": {"value": expression, "isExpression": True},
+    }, active_colors[value]
+
+
+async def ensure_feedback(client: CompanionClient, control_id: str, row: int, column: int, specs: list[tuple[str, str, bool]]):
+    expected = feedback_spec(specs)
+    snapshot = await client.get_control_snapshot(control_id)
+    if not snapshot.get("ok"):
+        raise RuntimeError(f"Could not inspect feedback on page 15 button {row}/{column}")
+    feedbacks = snapshot["body"]["config"].get("feedbacks", [])
+    if expected is None:
+        if feedbacks:
+            raise RuntimeError(f"Unexpected feedback on page 15 button {row}/{column}")
+        return
+    definition, options, active_color = expected
+    if len(feedbacks) > 1:
+        raise RuntimeError(f"Unexpected feedback count on page 15 button {row}/{column}")
+    if feedbacks:
+        feedback = feedbacks[0]
+        if feedback.get("connectionId") != "internal" or feedback.get("definitionId") != definition:
+            raise RuntimeError(f"Unexpected feedback on page 15 button {row}/{column}")
+        for key, value in options.items():
+            actual = feedback.get("options", {}).get(key)
+            if actual and actual != value:
+                raise RuntimeError(f"Unexpected feedback option on page 15 button {row}/{column}: {key}")
+        feedback_id = feedback["id"]
+    else:
+        result = await client.trpc_call(
+            "mutation",
+            "controls.entities.add",
+            input={
+                "controlId": control_id,
+                "entityLocation": "feedbacks",
+                "ownerId": None,
+                "connectionId": "internal",
+                "entityType": "feedback",
+                "entityDefinition": definition,
+            },
+        )
+        if not result.get("ok") or not result.get("body"):
+            raise RuntimeError(f"Could not add feedback to page 15 button {row}/{column}: {result.get('error')}")
+        feedback_id = result["body"]
+
+    for key, value in options.items():
+        await mutate(client, "controls.entities.setOption", {
+            "controlId": control_id, "entityLocation": "feedbacks", "entityId": feedback_id,
+            "key": key, "value": value,
+        })
+
+    snapshot = await client.get_control_snapshot(control_id)
+    if not snapshot.get("ok"):
+        raise RuntimeError(f"Could not inspect feedback style on page 15 button {row}/{column}")
+    feedback = next((item for item in snapshot["body"]["config"].get("feedbacks", []) if item.get("id") == feedback_id), None)
+    if not feedback:
+        raise RuntimeError(f"Feedback missing on page 15 button {row}/{column}")
+    for element, color in (("box0", active_color), ("text0", 0x111111)):
+        matches = [
+            item for item in feedback.get("styleOverrides", [])
+            if item.get("elementId") == element and item.get("elementProperty") == "color"
+        ]
+        override_id = matches[0]["overrideId"] if matches else uuid.uuid4().hex
+        await mutate(client, "controls.entities.replaceStyleOverride", {
+            "controlId": control_id, "entityLocation": "feedbacks", "entityId": feedback_id,
+            "override": {
+                "overrideId": override_id, "elementId": element, "elementProperty": "color",
+                "override": {"value": color, "isExpression": False},
+            },
+        })
+        for duplicate in matches[1:]:
+            await mutate(client, "controls.entities.removeStyleOverride", {
+                "controlId": control_id, "entityLocation": "feedbacks", "entityId": feedback_id,
+                "overrideId": duplicate["overrideId"],
+            })
 
 
 async def remove_old_button(client: CompanionClient, row: int, column: int, old_text: str, replacement_text: str | None = None):
@@ -203,6 +305,7 @@ async def ensure_button(client: CompanionClient, row: int, column: int, text: st
                 "controls.entities.setOption",
                 {"controlId": control_id, "entityLocation": {"stepId": "0", "setId": "down"}, "entityId": entity_id, "key": key, "value": option},
             )
+    await ensure_feedback(client, control_id, row, column, specs)
 
 
 async def main():

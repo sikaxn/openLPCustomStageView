@@ -13,7 +13,7 @@
  */
 @font-face {
   font-family: "OverlayLyric";
-  src: url("NotoSansSC-VariableFont_wght.ttf") format("opentype");
+  src: url("NotoSansSC-VariableFont_wght.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
 }
@@ -125,7 +125,7 @@ body {
 
   /* Match original behavior */
   width: 100%;
-  max-width: 80vw;
+  max-width: calc(100vw - 300px);
   text-align: center;
 
   /* Each lyric layer centers itself around this container's midpoint. */
@@ -147,11 +147,13 @@ body {
 
   /* Keep the entire lyric on one line; stage.js shrinks long lines to fit. */
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
 
   /* Maintain same styling as original */
-  font-size: clamp(32px, 4vw, 64px);
-  line-height: 1.2;
+  /* Banner starts at 192px minus 8px padding on each edge. */
+  font-size: 176px;
+  font-weight: 700;
+  line-height: 1;
   color: #fff;
 
   text-shadow:
@@ -181,12 +183,13 @@ body {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  max-width: 80vw;
+  max-width: calc(100vw - 300px);
+  box-sizing: border-box;
   padding: 0.35em 0.7em;
   border-radius: 0.15em;
   color: #fff;
   background: rgba(0, 0, 0, 0.78);
-  font-size: clamp(36px, 5vw, 96px);
+  font-size: clamp(32px, 9vw, 120px);
   font-weight: 700;
   line-height: 1.2;
   text-align: center;

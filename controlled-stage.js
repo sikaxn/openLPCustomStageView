@@ -469,7 +469,7 @@
     var size = parseFloat(window.getComputedStyle(element).fontSize) || 64;
     var width = element.clientWidth;
     for (var i = 0; i < 5 && element.scrollWidth > width && width > 0; i++) {
-      size = Math.max(12, size * width / element.scrollWidth - 0.25);
+      size = Math.max(32, size * width / element.scrollWidth - 0.25);
       element.style.fontSize = size + 'px';
     }
   }

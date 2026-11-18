@@ -25,7 +25,7 @@ Source `0` is the original OpenLP machine. An empty `host` for source 0 uses the
 ]
 ```
 
-For OpenLP and pySSP, `ws_port` is optional and defaults to the HTTP port plus one: 4317 and 5051 in the supplied configuration. Set it explicitly if another workstation uses a different WebSocket port. Set that screen's `stage_<screen_id>_source` Companion variable to an ID to switch sources. Page 15 has **Source 0** and **pySSP 1** buttons for each screen, plus **ALL Source 0** and **ALL pySSP 1** buttons to switch all four together. For another source ID, add a Companion custom-variable action that sets the source variable directly to that ID. Reload the stage page after editing `config.json`.
+For OpenLP and pySSP, `ws_port` is optional and defaults to the HTTP port plus one: 4317 and 5051 in the supplied configuration. Set it explicitly if another workstation uses a different WebSocket port. Set that screen's `stage_<screen_id>_source` Companion variable to an ID to switch sources. Page 15 has individual mode and source buttons, **ALL Lyrics**, **ALL Title**, **ALL Blank**, **ALL Source 0**, and **ALL pySSP 1**. Individual buttons light when their variable matches; bulk buttons light when all four variables match. For another source ID, add a Companion custom-variable action that sets the source variable directly to that ID. Reload the stage page after editing `config.json`.
 
 The pySSP source must run a version with cross-origin reads enabled for `/api/health` and `/api/v2/controller/live-items`; the corresponding update is in the sibling `pySSP` Git repo. Remote OpenLP must expose its read API to the viewing browser.
 
